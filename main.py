@@ -1,6 +1,9 @@
 import gym
 from model import Model
 import numpy as np
+import sys
+
+np.set_printoptions(threshold=sys.maxsize)
 
 verbosity = 2  # 1 = log information, 2 = render scenes
 OBSERVATIONS_SIZE = 6400  # Preprocessed observation size
@@ -38,6 +41,7 @@ def discountRewards(rewards, discountFactor):
     # Perform reward discount on each frame
     output = []
     for seg in segments:
+        # print('before discount: {}'.format(seg))
         reward_sum = sum(seg)
         discount = 1
         discounted_rewards = [0.] * len(seg)
@@ -50,8 +54,10 @@ def discountRewards(rewards, discountFactor):
 
         # print(discounted_rewards)
         output += discounted_rewards
+        # print('after discount: {}'.format(discounted_rewards))
 
-    output = np.asarray(output)
+    output = np.array(output)
+    # print('output: {}'.format(output))
     return output
 
 def mapAction(action, gymSpace=True):
@@ -76,7 +82,7 @@ def mapAction(action, gymSpace=True):
 def train(model: Model):
     model.training = True
 
-    episodes = 500
+    episodes = 3000
     log_every_episode = 5
     save_every_episode = 50
 
@@ -89,6 +95,8 @@ def train(model: Model):
     for ep in range(episodes):
         ob = model.env.reset()
         ob = prepro(ob)
+        new_ob, _, _, _ = model.env.step(model.env.action_space.sample())
+        new_ob = prepro(new_ob)
         done = False
 
         episode_states = []
@@ -101,12 +109,12 @@ def train(model: Model):
             if verbosity >= 2:
                 model.env.render()
 
-            action = model.return_action(model.observable_to_input(ob))
+            ob_delta = new_ob - ob
+            ob = new_ob
+
+            action = model.return_action(ob_delta)
             new_ob, reward, done, info = model.env.step(action)
             new_ob = prepro(new_ob)
-            ob_delta = new_ob - ob
-
-            model.current_step += 1
 
             # if r < 0:
             #     print('action: {}, reward: {}, r: {}, done: {}'.format(action, reward, r, done))
@@ -115,22 +123,28 @@ def train(model: Model):
             episode_actions.append(mapAction(action, gymSpace=True))
             episode_rewards.append(reward)
 
-            episode_rewards_total += episode_rewards_total
-
-            ob = new_ob
+            episode_rewards_total += reward
 
         # On completion of one episode
 
         # Rewards discount and standardization, refer back to Andrej's article for more detail on this
         discounted_rewards = discountRewards(episode_rewards, discountFactor=0.99)
+        # discounted_rewards = discount_rewards(episode_rewards, 0.99)
         rewards_mean = np.mean(discounted_rewards)
         rewards_stdd = np.std(discounted_rewards)
 
         discounted_rewards -= rewards_mean
         discounted_rewards /= rewards_stdd
+        # discounted_rewards *= -1.
 
-        episode_actions = np.array(episode_actions).reshape(-1, 1)
-        discounted_rewards = discounted_rewards.reshape(-1, 1)
+        # episode_actions = np.array(episode_actions).reshape(-1, 1)
+        # discounted_rewards = discounted_rewards.reshape(-1, 1)
+
+        model.current_step += 1
+
+        episode_states = np.vstack(episode_states)
+        episode_actions = np.vstack(episode_actions)
+        discounted_rewards = np.vstack(discounted_rewards)
 
         feed_dict = {
             model.states: episode_states,
@@ -139,7 +153,7 @@ def train(model: Model):
         }
 
         _, loss = model.sess.run(
-            [model.optimizer, model.reduced_loss],
+            [model.train_op, model.loss],
             feed_dict=feed_dict
         )
 
@@ -147,8 +161,10 @@ def train(model: Model):
         reward_averaged.append(np.mean(reward_history[-10:]))  # obtain mean of 10 most recent games
 
         if verbosity >= 1 and ep % log_every_episode == 0:
-            reward_info = "Max reward: {}, Average reward: {}\n".format(np.max(reward_history), np.mean(reward_history))
-            loss_info = "Episode: {}, log loss: {}\n".format(ep, loss)
+            reward_info = "Max reward: {}, Average reward: {}, accumulated_reward: {}\n".format(np.max(reward_history),
+                                                                                                np.mean(reward_history),
+                                                                                                episode_rewards_total)
+            loss_info = "Episode: {}, log loss: {}\n".format(model.current_step, loss)
 
             print(loss_info)
             print(reward_info)
