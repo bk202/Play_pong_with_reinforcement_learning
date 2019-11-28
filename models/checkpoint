@@ -1,6 +1,0 @@
-model_checkpoint_path: "deepQnet.ckpt-1451"
-all_model_checkpoint_paths: "deepQnet.ckpt-1251"
-all_model_checkpoint_paths: "deepQnet.ckpt-1301"
-all_model_checkpoint_paths: "deepQnet.ckpt-1351"
-all_model_checkpoint_paths: "deepQnet.ckpt-1401"
-all_model_checkpoint_paths: "deepQnet.ckpt-1451"
