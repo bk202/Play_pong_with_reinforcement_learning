@@ -1,0 +1,6 @@
+model_checkpoint_path: "deepQnet.ckpt-5556"
+all_model_checkpoint_paths: "deepQnet.ckpt-5356"
+all_model_checkpoint_paths: "deepQnet.ckpt-5406"
+all_model_checkpoint_paths: "deepQnet.ckpt-5456"
+all_model_checkpoint_paths: "deepQnet.ckpt-5506"
+all_model_checkpoint_paths: "deepQnet.ckpt-5556"
