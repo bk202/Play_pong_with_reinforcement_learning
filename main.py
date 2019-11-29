@@ -116,9 +116,6 @@ def train(model: Model):
             new_ob, reward, done, info = model.env.step(action)
             new_ob = prepro(new_ob)
 
-            # if r < 0:
-            #     print('action: {}, reward: {}, r: {}, done: {}'.format(action, reward, r, done))
-
             episode_states.append(ob_delta)
             episode_actions.append(mapAction(action, gymSpace=True))
             episode_rewards.append(reward)
@@ -129,16 +126,11 @@ def train(model: Model):
 
         # Rewards discount and standardization, refer back to Andrej's article for more detail on this
         discounted_rewards = discountRewards(episode_rewards, discountFactor=0.99)
-        # discounted_rewards = discount_rewards(episode_rewards, 0.99)
         rewards_mean = np.mean(discounted_rewards)
         rewards_stdd = np.std(discounted_rewards)
 
         discounted_rewards -= rewards_mean
         discounted_rewards /= rewards_stdd
-        # discounted_rewards *= -1.
-
-        # episode_actions = np.array(episode_actions).reshape(-1, 1)
-        # discounted_rewards = discounted_rewards.reshape(-1, 1)
 
         model.current_step += 1
 
@@ -177,13 +169,45 @@ def train(model: Model):
     model.save_model(model.current_step)
     f.close()
 
+def inference(model: Model):
+    model.training = False
+
+    while True:
+        done = False
+        ob = model.env.reset()
+        ob = prepro(ob)
+
+        new_ob, _, _, _ = model.env.step(model.env.action_space.sample())
+        new_ob = prepro(new_ob)
+
+        while not done:
+            model.env.render()
+
+            ob_delta = new_ob - ob
+            ob = new_ob
+
+            action = model.return_action(ob_delta)
+            new_ob, _, done, _ = model.env.step(action)
+            new_ob = prepro(new_ob)
+
 if __name__ == '__main__':
+    if len(sys.argv) <= 1:
+        print('Insufficient command line arguments provided, please choose model mode')
+        sys.exit()
+        
+    mode = sys.argv[1]
+
     env = gym.make('Pong-v0')
 
     rlModel = Model(OBSERVATIONS_SIZE, env)
 
     with rlModel.sess.as_default():
-        train(rlModel)
+        if mode == 'train':
+            train(rlModel)
+        elif mode == 'inference':
+            inference(rlModel)
+        else:
+            print('Unrecognized input mode "{}", please choose from [train, inference]'.format(mode))
 
     env.close()
 

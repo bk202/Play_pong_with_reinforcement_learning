@@ -11,7 +11,7 @@ class Model(object):
         self.observation_size = observation_size
         self.gamma = 0.005
         self.learning_rate = 0.0005
-        self.num_nodes = [200, 100, 1]  # 1 output for probability of going up
+        self.num_nodes = [200, 1]  # 1 output for probability of going up
         self.env = env
 
         self.sess = tf.Session()
@@ -53,38 +53,16 @@ class Model(object):
             
             '''
 
-            # self.log_loss = tf.reduce_mean(
-            #     tf.losses.log_loss(
-            #         labels=self.actions,
-            #         predictions=self.q_primary,
-            #         weights=self.rewards,
-            #         reduction=tf.losses.Reduction.NONE
-            #     )
-            # )
-            # self.loss = tf.reduce_mean(self.log_loss)
-            # self.loss = tf.reduce_mean(tf.square(self.q_primary - tf.multiply(self.rewards, self.actions)))
-
-            # self.loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            #     labels=tf.multiply(self.rewards, self.actions),
-            #     logits=self.q_primary
-            # )
-            # self.reduced_loss = tf.reduce_mean(self.loss)
-
-            # self.log_loss = tf.multiply(
-            #     tf.square(self.q_primary - self.actions),
-            #     tf.multiply(self.rewards, -1.)
+            # self.loss = tf.losses.log_loss(
+            #     labels=self.actions,
+            #     predictions=self.network,
+            #     weights=self.rewards
             # )
 
-            # self.epsilon = 1e-7
-            # self.cross_entropy = -1. * ((self.actions)*tf.log(self.network+self.epsilon) +
-            #                             (1. - self.actions)*tf.log(1. - self.network + self.epsilon))
-            # self.loss = tf.reduce_mean(
-            #     (self.cross_entropy * self.rewards) + self.rewards
-            # )
-            self.loss = tf.losses.log_loss(
-                labels=self.actions,
-                predictions=self.network,
-                weights=self.rewards
+            self.epsilon = 1e-7
+            self.loss = tf.reduce_mean(
+                (self.rewards * self.actions * -tf.log(self.network + self.epsilon)+
+                 (self.rewards * (1. - self.actions) * -tf.log(1. - self.network + self.epsilon)))
             )
 
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
@@ -94,20 +72,6 @@ class Model(object):
     def buildModel(self, input, name):
 
         with tf.variable_scope('{}'.format(name), reuse=tf.AUTO_REUSE):
-            # # fc layer 1
-            # fc1 = tf.layers.dense(input,
-            #                       self.num_nodes[0],
-            #                       activation=tf.nn.relu,
-            #                       kernel_initializer=tf.keras.initializers.glorot_uniform(),
-            #                       name='{}_fc_1'.format(name))
-            #
-            # # fc layer 2
-            # fc2 = tf.layers.dense(fc1,
-            #                       self.num_nodes[1],
-            #                       activation=tf.nn.relu,
-            #                       kernel_initializer=tf.keras.initializers.glorot_uniform(),
-            #                       name='{}_fc_2'.format(name))
-
             # fc layer 2
             fc2 = tf.layers.dense(input,
                                   self.num_nodes[0],
@@ -117,7 +81,7 @@ class Model(object):
 
             # output layer
             output = tf.layers.dense(fc2,
-                                     self.num_nodes[2],
+                                     self.num_nodes[-1],
                                      activation=tf.nn.sigmoid,
                                      kernel_initializer=tf.keras.initializers.glorot_uniform(),
                                      name='{}_output'.format(name))
@@ -154,9 +118,7 @@ class Model(object):
         return state.flatten()
 
     def return_action(self, state, epsilon=0.1):
-        # up_probability = tf.sigmoid(self.q_primary).eval({self.states: state.reshape(1, -1)})[0]
         up_probability = self.network.eval({self.states: state.reshape(1, -1)})[0]
-        # print('up probability: {}'.format(up_probability))
 
         if np.random.uniform() < up_probability:
             return 2
